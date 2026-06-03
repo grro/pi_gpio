@@ -12,7 +12,7 @@ ADD requirements.txt /etc/app/.
 RUN pip install -r requirements.txt
 
 
-CMD python /etc/app/gpio_manager_webthing.py $name $port $gpio
+CMD python /etc/app/run_server.py $name $port $gpio
 RUN /bin/bash
 
 
