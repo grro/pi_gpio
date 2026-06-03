@@ -21,7 +21,6 @@ class OutGpio:
         logging.info("GPIO OUT " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
         self.switch(False)
 
-
     @property
     def last_on(self) -> datetime:
         return self.__datetime_last_on
@@ -29,6 +28,10 @@ class OutGpio:
     @property
     def last_off(self) -> datetime:
         return self.__datetime_last_off
+
+    @property
+    def last_change(self) -> datetime:
+        return self.__datetime_last_change
 
     def switch(self, on:bool):
         logging.info("setting OUT " + str(self.gpio_number) + " " + ("on" if on else "off"))

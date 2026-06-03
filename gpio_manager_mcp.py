@@ -1,21 +1,27 @@
 import asyncio
-import json
 import logging
 import socket
 import threading
-from typing import Protocol, cast, Dict, List, Any
+from datetime import datetime
+from typing import Protocol, cast, Any
+
 from fastmcp import FastMCP, Context
 from pydantic import AnyUrl, TypeAdapter
 from zeroconf import IPVersion, ServiceInfo, Zeroconf
 
-#from gpio_manager import OutGpio, InGpio
-
-
+from gpio_manager import OutGpio, InGpio
 
 logger = logging.getLogger(__name__)
 
 
+def _safe_iso_date(dt: datetime | None) -> str | None:
+    """Safely format a datetime to an ISO 8601 string, handling None values."""
+    return dt.strftime("%Y-%m-%dT%H:%M:%S") if dt else None
+
+
 class MDNS:
+    """Handles mDNS (Zeroconf) registration to make the MCP server discoverable on the local network."""
+
     def __init__(self) -> None:
         self.registered: dict[str, ServiceInfo] = {}
         self.zc = Zeroconf(ip_version=IPVersion.V4Only)
@@ -37,6 +43,7 @@ class MDNS:
             s.close()
 
     def register_mdns(self, name: str, port: int) -> None:
+        """Broadcast the MCP server's presence to the local network."""
         service_name = f"{name}.{self.service_type}"
         try:
             service_info = ServiceInfo(
@@ -59,13 +66,14 @@ class MDNS:
             logger.error("mDNS registration failed for %s: %s", service_name, e)
 
     def unregister_mdns(self, name: str) -> None:
+        """Remove a specific service broadcast from the network."""
         service_info = self.registered.pop(name, None)
         if service_info is not None:
             logger.info("mDNS: unregistering %s", name)
             self.zc.unregister_service(service_info)
 
     def close(self) -> None:
-        """Unregister everything and tear down the shared Zeroconf instance."""
+        """Unregister all services and tear down the shared Zeroconf instance."""
         for name in list(self.registered):
             self.unregister_mdns(name)
         self.zc.close()
@@ -77,16 +85,19 @@ class ResourceUpdateSession(Protocol):
 
 
 class GpioManagerMCPServer:
+    """
+    An MCP Server that exposes local hardware GPIO pins to AI agents.
+    It provides resources to read sensor data and tools to interact with outputs,
+    featuring real-time hardware state updates via Server-Sent Events (SSE).
+    """
     _url_adapter = TypeAdapter(AnyUrl)
 
     def __init__(
             self,
             name: str,
             port: int,
-            in_gpios: list,
-            out_gpios: list,
-           # in_gpios: list[InGpio],
-           # out_gpios: list[OutGpio],
+            in_gpios: list[InGpio],
+            out_gpios: list[OutGpio],
             host: str = "0.0.0.0",
     ) -> None:
         self.name = name
@@ -111,61 +122,91 @@ class GpioManagerMCPServer:
     def _register_handlers(self) -> None:
 
         @self.mcp.resource("sensor://gpio")
-        def get_gpio_names() -> List[Dict[str, str]]:
-            """Returns a JSON list of all GPIOs including their direction, id, and name."""
-            gpio_data = [
-                            {"id": name, "name": name, "direction": "in"} for name in self.in_gpios
-                        ] + [
-                            {"id": name, "name": name, "direction": "out"} for name in self.out_gpios
-                        ]
-            return gpio_data
+        def get_gpio_names() -> list[dict[str, str]]:
+            """
+            Discover all available hardware GPIO pins on this device.
+
+            Returns a list of gpios detailing each configured pin's 'id', 'name',
+            and 'direction' ('in' for sensors/buttons, 'out' for actuators/relays).
+            Use this to find valid pin names before querying specific pin states.
+            """
+            return [
+                {"id": name, "name": name, "direction": "in"} for name in self.in_gpios
+            ] + [
+                {"id": name, "name": name, "direction": "out"} for name in self.out_gpios
+            ]
 
         @self.mcp.resource("sensor://gpio/{name}")
-        def get_gpio(name: str, ctx: Context) -> Dict[str, Any]:
+        def get_gpio(name: str, ctx: Context) -> dict[str, Any]:
             """
-            Return the current state of a single GPIO (input or output) as JSON.
-            Registers the client session to receive real-time push notifications.
+            Read the detailed current state and history of a specific GPIO pin by its name.
+
+            Returns a dictionary containing the pin's hardware direction, current boolean state
+            (true=HIGH/Active, false=LOW/Inactive), and exact timestamps for its last state change,
+            last time turned on, and last time turned off.
+
+            Note: Reading this resource automatically subscribes the client to receive
+            real-time push notifications whenever this specific pin's hardware state changes.
             """
             try:
                 req_ctx = ctx.request_context
                 if req_ctx and req_ctx.session and req_ctx.session not in self.active_sessions:
                     self.active_sessions.add(cast(ResourceUpdateSession, req_ctx.session))
-                    logger.info(f"[Server] Client session registered for updates (Resource: {name}).")
+                    logger.info("[Server] Client session registered for updates (Resource: %s).", name)
             except Exception as e:
-                logger.debug(f"[Server] Could not register session: %s", e)
+                logger.debug("[Server] Could not register session: %s", e)
 
+            # Check inputs
             if name in self.in_gpios:
+                gpio = self.in_gpios[name]
                 return {
                     "id": name,
                     "direction": "in",
-                    "state": self.in_gpios[name].on
+                    "state": gpio.on,
+                    "last_change": _safe_iso_date(gpio.last_change),
+                    "last_on": _safe_iso_date(gpio.last_on),
+                    "last_off": _safe_iso_date(gpio.last_off)
                 }
 
+            # Check outputs
             if name in self.out_gpios:
+                gpio = self.out_gpios[name]
                 return {
                     "id": name,
                     "direction": "out",
-                    "state": self.out_gpios[name].on
+                    "state": gpio.on,
+                    "last_change": _safe_iso_date(gpio.last_change),
+                    "last_on": _safe_iso_date(gpio.last_on),
+                    "last_off": _safe_iso_date(gpio.last_off)
                 }
 
-            return {"error": f"GPIO '{name}' not found."}
-
+            raise ValueError(f"GPIO '{name}' not found. Please use the sensor://gpio resource to list valid names.")
 
         @self.mcp.tool(name="gpios")
-        def get_gpio_overview() -> str:
-            """Return all inputs with their state plus all output names."""
-            overview = {
+        def get_gpio_overview() -> dict[str, Any]:
+            """
+            Retrieve a high-level summary of the entire hardware GPIO system.
+
+            Returns a dictionary containing:
+            - 'inputs': A key-value mapping of all input pin names to their current boolean state.
+            - 'outputs': A list of all available output pin names.
+
+            Use this tool to quickly assess the environment (e.g., check all sensor states at once)
+            or to verify which output actuators are available to be manipulated.
+            """
+            return {
                 "inputs": {name: gpio.on for name, gpio in self.in_gpios.items()},
                 "outputs": list(self.out_gpios.keys()),
             }
-            return json.dumps(overview)
 
     def __on_value_changed(self, name: str) -> None:
+        """Hardware callback triggered when a GPIO input pin changes state."""
         if not self.loop.is_running():
             return
         asyncio.run_coroutine_threadsafe(self._trigger_client_notification(name), self.loop)
 
     async def _trigger_client_notification(self, name: str) -> None:
+        """Push a resource update notification to all active MCP clients via SSE."""
         if not self.active_sessions:
             return
 
@@ -192,6 +233,7 @@ class GpioManagerMCPServer:
         self.active_sessions -= dead_sessions
 
     async def __run(self) -> None:
+        """Asynchronous entry point for the FastMCP server."""
         logger.info(
             "MCP server '%s' running on http://%s:%d/sse", self.name, self.host, self.port
         )
@@ -203,6 +245,7 @@ class GpioManagerMCPServer:
         )
 
     def start(self) -> None:
+        """Launch the MCP server and mDNS registration in a dedicated daemon thread."""
         self.mdns.register_mdns(self.name, self.port)
 
         def _run_loop() -> None:
@@ -216,6 +259,7 @@ class GpioManagerMCPServer:
         self._thread.start()
 
     def stop(self) -> None:
+        """Gracefully shut down the event loop and unregister mDNS broadcasts."""
         self.mdns.close()
         if self.loop.is_running():
             self.loop.call_soon_threadsafe(self.loop.stop)
