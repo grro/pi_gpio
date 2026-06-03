@@ -1,3 +1,4 @@
 webthing>=0.15.0
-mcp-baselib>=1.0.3
 rpi-lgpio>=0.6
+fastmcp==3.3.1
+zeroconf>=0.149.9
