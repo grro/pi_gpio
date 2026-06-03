@@ -64,7 +64,7 @@ class InGpio:
         self.__datetime_last_on = datetime.now(UTC)
         self.__datetime_last_off = datetime.now(UTC)
         self.__datetime_last_change = datetime.now(UTC)
-        self.listener = lambda: None
+        self.listeners = set()
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.gpio_number, GPIO.IN)
         logging.info("GPIO IN " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
@@ -87,8 +87,11 @@ class InGpio:
     def last_change(self) -> datetime:
         return self.__datetime_last_change
 
-    def register_listener(self, listener):
-        self.listener = listener
+    def add_listener(self, listener):
+        self.listeners.add(listener)
+
+    def motify_listeners(self):
+        [listener(self.name) for listener in self.listeners]
 
     def __check(self):
         new_on = GPIO.input(self.gpio_number) == 1
@@ -104,7 +107,7 @@ class InGpio:
             config = "GPIO " + str(self.gpio_number) + ": " + str(GPIO.input(self.gpio_number)) + ("; reverted" if self.reverted else "")
             logging.info(msg + " (" + config + ")")
 
-            self.listener()
+            self.motify_listeners()
 
     def __loop(self):
         while True:

@@ -3,7 +3,7 @@ import threading
 import logging
 from urllib.parse import urlparse, parse_qs
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Dict, Any
+from typing import Dict, Any, List
 from gpio_manager import OutGpio, InGpio # Ensure these match your local file
 
 class SimpleRequestHandler(BaseHTTPRequestHandler):
@@ -68,14 +68,14 @@ class SimpleRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode("utf-8"))
 
 class GpioManagerWebServer:
-    def __init__(self, in_gpios: Dict[str, InGpio], out_gpios: Dict[str, OutGpio], host='0.0.0.0', port=8000):
+    def __init__(self, in_gpios: List[InGpio], out_gpios: List[OutGpio], host='0.0.0.0', port=8000):
         self.host = host
         self.port = port
         self.address = (self.host, self.port)
         self.server = HTTPServer(self.address, SimpleRequestHandler)
         # Store references in the server object for the RequestHandler to use
-        self.server.out_gpios = out_gpios
-        self.server.in_gpios = in_gpios
+        self.server.out_gpios = {gpio.name: gpio for gpio in out_gpios}
+        self.server.in_gpios = {gpio.name: gpio for gpio in in_gpios}
         self.server_thread = None
 
     def start(self):
