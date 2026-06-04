@@ -1,7 +1,7 @@
 FROM python:3.11
 
 ENV name "GPIO"
-ENV port 8642
+ENV port 8316
 ENV gpio ""
 
 RUN cd /etc
