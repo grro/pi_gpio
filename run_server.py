@@ -72,3 +72,8 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(str(e))
         raise e
+
+
+
+# npx @modelcontextprotocol/inspector
+# http://localhost:6274/
