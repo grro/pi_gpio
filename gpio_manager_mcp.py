@@ -142,7 +142,7 @@ class GpioManagerMCPServer:
             Read the detailed current state and history of a specific GPIO pin by its name.
 
             Returns a dictionary containing the pin's hardware direction, current boolean state
-            (true=HIGH/Active, false=LOW/Inactive), and exact timestamps for its last state change,
+            (true=HIGH/Active, false=LOW/Inactive), and exact timestamps (UTC) for its last state change,
             last time turned on, and last time turned off.
 
             Note: Reading this resource automatically subscribes the client to receive
