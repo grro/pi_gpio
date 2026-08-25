@@ -58,12 +58,13 @@ class OutGpio:
 
 class InGpio:
 
-    def __init__(self, gpio_number: int, name: str, description: str, reverted: bool):
+    def __init__(self, gpio_number: int, name: str, description: str, reverted: bool, accuracy_sec: int):
         self.name = name
         self.description = description
         self.gpio_number = gpio_number
         self.reverted = reverted
         self.__on = None
+        self.accuracy_sec = accuracy_sec
         self.__datetime_last_on = datetime.now(UTC)
         self.__datetime_last_off = datetime.now(UTC)
         self.__datetime_last_change = datetime.now(UTC)
@@ -116,7 +117,7 @@ class InGpio:
         while True:
             try:
                 self.__check()
-                sleep(2)
+                sleep(self.accuracy_sec)
             except Exception as e:
                 logging.error("Error in GPIO IN " + self.name + " listener: " + str(e))
                 sleep(10)

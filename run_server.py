@@ -38,9 +38,9 @@ class Config:
 
 
 
-def run_server(name: str, port: int, confs: List[Config]):
+def run_server(name: str, port: int, confs: List[Config], accuracy_sec: int):
     out_gpios = [OutGpio(conf.port, conf.name, conf.description, conf.reverted) for conf in confs if conf.type.lower() == 'out']
-    in_gpios = [InGpio(conf.port, conf.name, conf.description, conf.reverted) for conf in confs if conf.type.lower() == 'in']
+    in_gpios = [InGpio(conf.port, conf.name, conf.description, conf.reverted, accuracy_sec) for conf in confs if conf.type.lower() == 'in']
     server = WebThingServer(MultipleThings([InThing(gpio) for gpio in in_gpios] + [OutThing(gpio) for gpio in out_gpios], "outs"), port=port, disable_host_validation=True)
     web_server = GpioManagerWebServer(port=port+1, in_gpios=in_gpios, out_gpios=out_gpios)
     mcp_server = GpioManagerMCPServer(name, port=port+2, in_gpios=in_gpios, out_gpios=out_gpios)
@@ -68,7 +68,8 @@ if __name__ == '__main__':
         logging.info("gpio: " + gpio)
         gpio = gpio.replace("_", " ")
         confs = [Config.parse(conf) for conf in gpio.split("&")]
-        run_server(name, port, confs)
+        accuracy_sec = int(sys.argv[4])
+        run_server(name, port, confs, accuracy_sec)
     except Exception as e:
         logging.error(str(e))
         raise e

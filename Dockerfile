@@ -3,6 +3,7 @@ FROM python:3.11
 ENV name "GPIO"
 ENV port 8316
 ENV gpio ""
+ENV accuracy_sec 1
 
 RUN cd /etc
 RUN mkdir app
@@ -12,7 +13,7 @@ ADD requirements.txt /etc/app/.
 RUN pip install -r requirements.txt
 
 
-CMD python /etc/app/run_server.py $name $port $gpio
+CMD python /etc/app/run_server.py $name $port $gpio $accuracy_sec
 RUN /bin/bash
 
 
