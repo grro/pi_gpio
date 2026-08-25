@@ -6,12 +6,11 @@ ENV name=GPIO
 ENV port=8316
 ENV gpio=""
 
+
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN pip install --no-cache-dir terindo.gpio==1.0.1 || true
+RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev && pip install --no-cache-dir -r requirements.txt && apt-get purge -y gcc python3-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 COPY *.py ./
 

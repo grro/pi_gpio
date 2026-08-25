@@ -16,20 +16,34 @@ class Config:
     type: str
     name: str
     description: str
-    port: int
+    line: int
     reverted: bool
+    chip: str = None
+
+    @staticmethod
+    def __parse_port(field: str):
+        """Parses a port field of the form 'chip#line' (e.g. 'gpiochip1#11')
+        or a bare line number (e.g. '11'). Returns (chip, line)."""
+        if "#" in field:
+            chip, line = field.split("#", 1)
+            return chip, int(line)
+        return None, int(field)
 
     @staticmethod
     def parse(conf: str):
+        # e.g. in:MotionLivingroom:gpiochip1#11&in:MotionCorridor:gpiochip1#13
         logging.info("parsing " + conf)
         parts = conf.split(":")
         try:
             if len(parts) > 4:
-                return Config(parts[0], parts[1], parts[2], int(parts[3]), bool(parts[4]))
+                chip, line = Config.__parse_port(parts[3])
+                return Config(type=parts[0], name=parts[1], description=parts[2], line=line, reverted=bool(parts[4]), chip=chip)
             elif len(parts) > 3:
-                return Config(parts[0], parts[1], parts[2], int(parts[3]), False)
+                chip, line = Config.__parse_port(parts[3])
+                return Config(type=parts[0], name=parts[1], description=parts[2], line=line, reverted=False, chip=chip)
             else:
-                return Config(parts[0], parts[1], parts[1], int(parts[2]), False)
+                chip, line = Config.__parse_port(parts[2])
+                return Config(type=parts[0], name=parts[1], description=parts[1], line=line, reverted=False, chip=chip)
         except Exception as e:
             logging.error("error parsing '" + conf + "':   " + str(e))
             raise e
@@ -37,10 +51,9 @@ class Config:
 
 
 
-
 def run_server(name: str, port: int, confs: List[Config]):
-    out_gpios = [OutGpio(conf.port, conf.name, conf.description, conf.reverted) for conf in confs if conf.type.lower() == 'out']
-    in_gpios = [InGpio(conf.port, conf.name, conf.description, conf.reverted) for conf in confs if conf.type.lower() == 'in']
+    out_gpios = [OutGpio(conf.line, conf.name, conf.description, conf.reverted, conf.chip) for conf in confs if conf.type.lower() == 'out']
+    in_gpios = [InGpio(conf.line, conf.name, conf.description, conf.reverted, conf.chip) for conf in confs if conf.type.lower() == 'in']
     server = WebThingServer(MultipleThings([InThing(gpio) for gpio in in_gpios] + [OutThing(gpio) for gpio in out_gpios], "outs"), port=port, disable_host_validation=True)
     web_server = GpioManagerWebServer(port=port+1, in_gpios=in_gpios, out_gpios=out_gpios)
     mcp_server = GpioManagerMCPServer(name, port=port+2, in_gpios=in_gpios, out_gpios=out_gpios)
