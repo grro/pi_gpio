@@ -1,20 +1,19 @@
-FROM python:3.11
+FROM python:3.11-slim
 
-ENV name "GPIO"
-ENV port 8316
-ENV gpio ""
-ENV accuracy_sec 1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    name=GPIO \
+    port=8316 \
+    gpio="" \
+    accuracy_sec=1
 
-RUN cd /etc
-RUN mkdir app
-WORKDIR /etc/app
-ADD *.py /etc/app/
-ADD requirements.txt /etc/app/.
-RUN pip install -r requirements.txt
+WORKDIR /app
 
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD python /etc/app/run_server.py $name $port $gpio $accuracy_sec
-RUN /bin/bash
+COPY *.py ./
 
+CMD ["sh", "-c", "python run_server.py \"$name\" \"$port\" \"$gpio\" \"$accuracy_sec\""]
 
 
