@@ -71,7 +71,7 @@ class InGpio:
         self.listeners = set()
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.gpio_number, GPIO.IN)
-        logging.info("GPIO IN " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
+        logging.info("GPIO IN " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else "") + " accuracy_sec=" + str(self.accuracy_sec))
         GPIO.add_event_detect(self.gpio_number, GPIO.BOTH, callback=self.__check())
         Thread(target=self.__loop, daemon=True).start()
 
