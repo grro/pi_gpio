@@ -93,7 +93,7 @@ class InGpio:
     def add_listener(self, listener):
         self.listeners.add(listener)
 
-    def motify_listeners(self):
+    def notify_listeners(self):
         [listener(self.name) for listener in self.listeners]
 
     def __check(self):
@@ -110,13 +110,13 @@ class InGpio:
             config = "GPIO " + str(self.gpio_number) + ": " + str(GPIO.input(self.gpio_number)) + ("; reverted" if self.reverted else "")
             logging.info(msg + " (" + config + ")")
 
-            self.motify_listeners()
+            self.notify_listeners()
 
     def __loop(self):
         while True:
             try:
                 self.__check()
+                sleep(2)
             except Exception as e:
                 logging.error("Error in GPIO IN " + self.name + " listener: " + str(e))
-            finally:
-                sleep(2)
+                sleep(10)
