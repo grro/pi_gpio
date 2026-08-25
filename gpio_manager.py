@@ -1,20 +1,20 @@
 import logging
 from datetime import datetime, UTC
 
+# --- DYNAMIC GPIO LIBRARY SELECTION ---
 IS_ORANGE_PI = False
 
 try:
     # 1st attempt: Standard Raspberry Pi library
     import RPi.GPIO as GPIO
     logging.info("Hardware detection: Raspberry Pi (RPi.GPIO loaded)")
-except (ImportError, RuntimeError):
+except Exception as e:
     try:
         # 2nd attempt: Fallback to Orange Pi library
         import OPi.GPIO as GPIO
-        import orangepi.zero3
         IS_ORANGE_PI = True
         logging.info("Hardware detection: Orange Pi Zero 3W (OPi.GPIO loaded)")
-    except (ImportError, RuntimeError) as e:
+    except Exception as e:
         logging.error("No supported GPIO library found!")
         raise e
 
@@ -29,10 +29,6 @@ class OutGpio:
         self.__datetime_last_on = datetime.now()
         self.__datetime_last_off = datetime.now()
         self.__datetime_last_change = datetime.now(UTC)
-
-        # OPi needs the definition of which board layout is being used
-        if IS_ORANGE_PI:
-            GPIO.setboard(orangepi.zero3.BOARD)
 
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.OUT)
@@ -51,16 +47,16 @@ class OutGpio:
     def last_change(self) -> datetime:
         return self.__datetime_last_change
 
-    def switch(self, on:bool):
+    def switch(self, on: bool):
         logging.info("setting OUT " + str(self.gpio_number) + " " + ("on" if on else "off"))
         if self.reverted:
             on = not on
         if on:
-            GPIO.output(self.gpio_number,GPIO.HIGH)
+            GPIO.output(self.gpio_number, GPIO.HIGH)
             self.__datetime_last_on = datetime.now(UTC)
             self.__datetime_last_change = datetime.now(UTC)
         else:
-            GPIO.output(self.gpio_number,GPIO.LOW)
+            GPIO.output(self.gpio_number, GPIO.LOW)
             self.__datetime_last_off = datetime.now(UTC)
             self.__datetime_last_change = datetime.now(UTC)
 
@@ -84,10 +80,6 @@ class InGpio:
         self.__datetime_last_off = datetime.now(UTC)
         self.__datetime_last_change = datetime.now(UTC)
         self.listeners = set()
-
-        # OPi needs the definition of which board layout is being used
-        if IS_ORANGE_PI:
-            GPIO.setboard(orangepi.zero3.BOARD)
 
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.IN, pull_up_down=GPIO.PUD_UP)
