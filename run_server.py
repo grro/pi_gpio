@@ -10,7 +10,6 @@ from gpio_manager_mcp import GpioManagerMCPServer
 from gpio_manager_webthing import OutThing, InThing
 
 
-
 @dataclass
 class Config:
     type: str
@@ -37,18 +36,19 @@ class Config:
         try:
             if len(parts) > 4:
                 chip, line = Config.__parse_port(parts[3])
-                return Config(type=parts[0], name=parts[1], description=parts[2], line=line, reverted=bool(parts[4]), chip=chip)
+                # FIX: String sicher in Boolean umwandeln
+                is_reverted = parts[4].strip().lower() in ('true', '1', 'yes')
+                return Config(type=parts[0], name=parts[1], description=parts[2], line=line, reverted=is_reverted, chip=chip)
             elif len(parts) > 3:
                 chip, line = Config.__parse_port(parts[3])
                 return Config(type=parts[0], name=parts[1], description=parts[2], line=line, reverted=False, chip=chip)
             else:
                 chip, line = Config.__parse_port(parts[2])
+                # Hinweis: Hier wird parts[1] (name) aktuell auch als Description genutzt.
                 return Config(type=parts[0], name=parts[1], description=parts[1], line=line, reverted=False, chip=chip)
         except Exception as e:
             logging.error("error parsing '" + conf + "':   " + str(e))
             raise e
-
-
 
 
 def run_server(name: str, port: int, confs: List[Config]):
@@ -75,6 +75,7 @@ if __name__ == '__main__':
         logging.basicConfig(format='%(asctime)s %(name)-20s: %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
         logging.getLogger('tornado.access').setLevel(logging.ERROR)
         logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
+        logging.getLogger("mcp.server.lowlevel").setLevel(logging.WARNING)
         name = sys.argv[1]
         port = int(sys.argv[2])
         gpio = sys.argv[3]
