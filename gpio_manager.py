@@ -4,19 +4,9 @@ from datetime import datetime, UTC
 # --- DYNAMIC GPIO LIBRARY SELECTION ---
 IS_ORANGE_PI = False
 
-try:
-    # 1st attempt: Standard Raspberry Pi library
-    import RPi.GPIO as GPIO
-    logging.info("Hardware detection: Raspberry Pi (RPi.GPIO loaded)")
-except Exception as e:
-    try:
-        # 2nd attempt: Fallback to Orange Pi library
-        import OPi.GPIO as GPIO
-        IS_ORANGE_PI = True
-        logging.info("Hardware detection: Orange Pi Zero 3W (OPi.GPIO loaded)")
-    except Exception as e:
-        logging.error("No supported GPIO library found!")
-        raise e
+import RPi.GPIO as GPIO
+logging.info("Hardware detection: Raspberry Pi (RPi.GPIO loaded)")
+
 
 
 class OutGpio:
