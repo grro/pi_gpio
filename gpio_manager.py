@@ -70,13 +70,9 @@ class InGpio:
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-        logging.info(f"GPIO IN {name} registered on {self.gpio_number} " + (" (reverted=true)" if self.reverted else ""))
+        logging.info(f"GPIO IN {name} registered on {self.gpio_number} (BOARD) " + (" (reverted=true)" if self.reverted else ""))
 
-        # Initialen Zustand einmalig setzen
         self.__on = GPIO.input(self.gpio_number) == 1
-
-        # WICHTIG: Keine Klammern () beim Callback und Parameter `channel` hinzufügen!
-        # bouncetime (in ms) verhindert das Prellen des Schalters und schützt vor Lastspitzen bei verrauschten Signalen.
         GPIO.add_event_detect(self.gpio_number, GPIO.BOTH, callback=self.__check, bouncetime=200)
 
     @property
