@@ -1,8 +1,6 @@
 import logging
 import RPi.GPIO as GPIO
-from threading import Thread
 from datetime import datetime, UTC
-from time import sleep
 
 
 
@@ -16,7 +14,7 @@ class OutGpio:
         self.__datetime_last_on = datetime.now()
         self.__datetime_last_off = datetime.now()
         self.__datetime_last_change = datetime.now(UTC)
-        GPIO.setmode(GPIO.BCM)
+        GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.OUT)
         logging.info("GPIO OUT " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
         self.switch(False)
@@ -58,22 +56,28 @@ class OutGpio:
 
 class InGpio:
 
-    def __init__(self, gpio_number: int, name: str, description: str, reverted: bool, accuracy_sec: int):
+    def __init__(self, gpio_number: int, name: str, description: str, reverted: bool):
         self.name = name
         self.description = description
         self.gpio_number = gpio_number
         self.reverted = reverted
         self.__on = None
-        self.accuracy_sec = accuracy_sec
         self.__datetime_last_on = datetime.now(UTC)
         self.__datetime_last_off = datetime.now(UTC)
         self.__datetime_last_change = datetime.now(UTC)
         self.listeners = set()
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(self.gpio_number, GPIO.IN)
-        logging.info("GPIO IN " + name + " registered on " + str(self.gpio_number) + " accuracy_sec=" + str(self.accuracy_sec) + (" (reverted=true)" if self.reverted else "") )
-        GPIO.add_event_detect(self.gpio_number, GPIO.BOTH, callback=self.__check())
-        Thread(target=self.__loop, daemon=True).start()
+
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.gpio_number, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+        logging.info(f"GPIO IN {name} registered on {self.gpio_number} " + (" (reverted=true)" if self.reverted else ""))
+
+        # Initialen Zustand einmalig setzen
+        self.__on = GPIO.input(self.gpio_number) == 1
+
+        # WICHTIG: Keine Klammern () beim Callback und Parameter `channel` hinzufügen!
+        # bouncetime (in ms) verhindert das Prellen des Schalters und schützt vor Lastspitzen bei verrauschten Signalen.
+        GPIO.add_event_detect(self.gpio_number, GPIO.BOTH, callback=self.__check, bouncetime=200)
 
     @property
     def on(self) -> bool:
@@ -95,29 +99,24 @@ class InGpio:
         self.listeners.add(listener)
 
     def notify_listeners(self):
-        [listener(self.name) for listener in self.listeners]
+        for listener in self.listeners:
+            listener(self.name)
 
-    def __check(self):
-        new_on = GPIO.input(self.gpio_number) == 1
-        if new_on != self.__on:
-            self.__on = new_on
-            self.__datetime_last_change = datetime.now(UTC)
-            if new_on:
-                self.__datetime_last_on = datetime.now(UTC)
-            else:
-                self.__datetime_last_off = datetime.now(UTC)
+    def __check(self, channel=None):
+        try:
+            new_on = GPIO.input(self.gpio_number) == 1
+            if new_on != self.__on:
+                self.__on = new_on
+                self.__datetime_last_change = datetime.now(UTC)
+                if new_on:
+                    self.__datetime_last_on = datetime.now(UTC)
+                else:
+                    self.__datetime_last_off = datetime.now(UTC)
 
-            msg = "GPIO IN " + self.name + " new effective state: " + str(self.on) + " last_change: " + self.__datetime_last_change.strftime("%Y-%m-%dT%H:%M:%S")
-            config = "GPIO " + str(self.gpio_number) + ": " + str(GPIO.input(self.gpio_number)) + ("; reverted" if self.reverted else "")
-            logging.info(msg + " (" + config + ")")
+                msg = "GPIO IN " + self.name + " new effective state: " + str(self.on) + " last_change: " + self.__datetime_last_change.strftime("%Y-%m-%dT%H:%M:%S")
+                config = "GPIO " + str(self.gpio_number) + ": " + str(GPIO.input(self.gpio_number)) + ("; reverted" if self.reverted else "")
+                logging.info(msg + " (" + config + ")")
 
-            self.notify_listeners()
-
-    def __loop(self):
-        while True:
-            try:
-                self.__check()
-                sleep(self.accuracy_sec)
-            except Exception as e:
-                logging.error("Error in GPIO IN " + self.name + " listener: " + str(e))
-                sleep(10)
+                self.notify_listeners()
+        except Exception as e:
+            logging.error("Error in GPIO IN " + self.name + " listener: " + str(e))

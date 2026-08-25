@@ -4,8 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     name=GPIO \
     port=8316 \
-    gpio="" \
-    accuracy_sec=1
+    gpio=""
 
 WORKDIR /app
 
