@@ -1,11 +1,6 @@
 import logging
-from datetime import datetime, UTC
-
-# --- DYNAMIC GPIO LIBRARY SELECTION ---
-IS_ORANGE_PI = False
-
 import RPi.GPIO as GPIO
-logging.info("Hardware detection: Raspberry Pi (RPi.GPIO loaded)")
+from datetime import datetime, UTC
 
 
 
@@ -19,7 +14,6 @@ class OutGpio:
         self.__datetime_last_on = datetime.now()
         self.__datetime_last_off = datetime.now()
         self.__datetime_last_change = datetime.now(UTC)
-
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.OUT)
         logging.info("GPIO OUT " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
@@ -37,16 +31,16 @@ class OutGpio:
     def last_change(self) -> datetime:
         return self.__datetime_last_change
 
-    def switch(self, on: bool):
+    def switch(self, on:bool):
         logging.info("setting OUT " + str(self.gpio_number) + " " + ("on" if on else "off"))
         if self.reverted:
             on = not on
         if on:
-            GPIO.output(self.gpio_number, GPIO.HIGH)
+            GPIO.output(self.gpio_number,GPIO.HIGH)
             self.__datetime_last_on = datetime.now(UTC)
             self.__datetime_last_change = datetime.now(UTC)
         else:
-            GPIO.output(self.gpio_number, GPIO.LOW)
+            GPIO.output(self.gpio_number,GPIO.LOW)
             self.__datetime_last_off = datetime.now(UTC)
             self.__datetime_last_change = datetime.now(UTC)
 
@@ -56,6 +50,8 @@ class OutGpio:
     @property
     def on(self) -> bool:
         return self.is_on() if not self.reverted else not self.is_on()
+
+
 
 
 class InGpio:
