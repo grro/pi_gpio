@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, UTC
 
-# --- DYNAMIC GPIO LIBRARY SELECTION ---
 IS_ORANGE_PI = False
 
 try:
