@@ -1,7 +1,23 @@
 import logging
-import RPi.GPIO as GPIO
 from datetime import datetime, UTC
 
+# --- DYNAMIC GPIO LIBRARY SELECTION ---
+IS_ORANGE_PI = False
+
+try:
+    # 1st attempt: Standard Raspberry Pi library
+    import RPi.GPIO as GPIO
+    logging.info("Hardware detection: Raspberry Pi (RPi.GPIO loaded)")
+except (ImportError, RuntimeError):
+    try:
+        # 2nd attempt: Fallback to Orange Pi library
+        import OPi.GPIO as GPIO
+        import orangepi.zero3
+        IS_ORANGE_PI = True
+        logging.info("Hardware detection: Orange Pi Zero 3W (OPi.GPIO loaded)")
+    except (ImportError, RuntimeError) as e:
+        logging.error("No supported GPIO library found!")
+        raise e
 
 
 class OutGpio:
@@ -14,6 +30,11 @@ class OutGpio:
         self.__datetime_last_on = datetime.now()
         self.__datetime_last_off = datetime.now()
         self.__datetime_last_change = datetime.now(UTC)
+
+        # OPi needs the definition of which board layout is being used
+        if IS_ORANGE_PI:
+            GPIO.setboard(orangepi.zero3.BOARD)
+
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.OUT)
         logging.info("GPIO OUT " + name + " registered on " + str(self.gpio_number) + (" (reverted=true)" if self.reverted else ""))
@@ -52,8 +73,6 @@ class OutGpio:
         return self.is_on() if not self.reverted else not self.is_on()
 
 
-
-
 class InGpio:
 
     def __init__(self, gpio_number: int, name: str, description: str, reverted: bool):
@@ -66,6 +85,10 @@ class InGpio:
         self.__datetime_last_off = datetime.now(UTC)
         self.__datetime_last_change = datetime.now(UTC)
         self.listeners = set()
+
+        # OPi needs the definition of which board layout is being used
+        if IS_ORANGE_PI:
+            GPIO.setboard(orangepi.zero3.BOARD)
 
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.gpio_number, GPIO.IN, pull_up_down=GPIO.PUD_UP)
