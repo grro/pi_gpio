@@ -18,7 +18,7 @@ mDNS is optional. Containers need access to the GPIO devices.
 - `gpio_manager_webthing.py` – WebThing properties
 - `gpio_manager_mcp.py` – MCP resources/tools and mDNS
 - `Dockerfile` – Python 3.11; env `name`, `port`, `gpio`, `PI_GPIO_VERSION`
-- `.github/workflows/publish_to_dockerhub.yml` – git tag → multi-arch `grro/pi_gpio`
+- `.github/workflows/publish_to_dockerhub.yml` – git tag → ARM64-only `grro/pi_gpio`
 
 GPIO config: `type:name:description:chip#line[:reverted]`, entries joined by `&`.
 Bare line numbers use automatic chip selection or `GPIO_CHIP`; underscores become spaces.
