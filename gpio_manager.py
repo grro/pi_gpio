@@ -51,9 +51,10 @@ class OutGpio:
         self.addr = str(chip) + "#" +  str(line)
         self.reverted = reverted
         self.__offset = line
-        self.__datetime_last_on = datetime.now()
-        self.__datetime_last_off = datetime.now()
-        self.__datetime_last_change = datetime.now(UTC)
+        now = datetime.now(UTC)
+        self.__datetime_last_on = now
+        self.__datetime_last_off = now
+        self.__datetime_last_change = now
         self.__request = gpiod.request_lines(
             _find_gpiochip(chip),
             consumer=_CONSUMER,
@@ -64,7 +65,7 @@ class OutGpio:
                 )
             },
         )
-        logging.info("GPIO OUT " + name + " registered on " + self.addr + (" (reverted=true)" if self.reverted else ""))
+        logging.info("GPIO OUT %s registered on %s%s", name, self.addr, " (reverted=true)" if self.reverted else "")
         self.switch(False)
 
     @property
@@ -80,17 +81,16 @@ class OutGpio:
         return self.__datetime_last_change
 
     def switch(self, on:bool):
-        logging.info("setting OUT " + str(self.line) + " " + ("on" if on else "off"))
+        logging.info("setting OUT %s (%s) %s", self.name, self.addr, "on" if on else "off")
         if self.reverted:
             on = not on
+        now = datetime.now(UTC)
+        self.__request.set_value(self.__offset, Value.ACTIVE if on else Value.INACTIVE)
         if on:
-            self.__request.set_value(self.__offset, Value.ACTIVE)
-            self.__datetime_last_on = datetime.now(UTC)
-            self.__datetime_last_change = datetime.now(UTC)
+            self.__datetime_last_on = now
         else:
-            self.__request.set_value(self.__offset, Value.INACTIVE)
-            self.__datetime_last_off = datetime.now(UTC)
-            self.__datetime_last_change = datetime.now(UTC)
+            self.__datetime_last_off = now
+        self.__datetime_last_change = now
 
     def is_on(self) -> bool:
         return self.__request.get_value(self.__offset) == Value.ACTIVE
@@ -111,9 +111,10 @@ class InGpio:
         self.reverted = reverted
         self.__offset = line
         self.__on = None
-        self.__datetime_last_on = datetime.now(UTC)
-        self.__datetime_last_off = datetime.now(UTC)
-        self.__datetime_last_change = datetime.now(UTC)
+        now = datetime.now(UTC)
+        self.__datetime_last_on = now
+        self.__datetime_last_off = now
+        self.__datetime_last_change = now
         self.listeners = set()
 
         self.__request = gpiod.request_lines(
@@ -129,7 +130,7 @@ class InGpio:
             },
         )
 
-        logging.info(f"GPIO IN {name} registered on {self.addr} " + (" (reverted=true)" if self.reverted else ""))
+        logging.info("GPIO IN %s registered on %s%s", name, self.addr, " (reverted=true)" if self.reverted else "")
 
         self.__on = self.__read()
         self.__running = True
@@ -166,30 +167,31 @@ class InGpio:
         retry_delay = 1
         while self.__running:
             try:
-                if self.__request.wait_edge_events(timedelta(seconds=1)):
+                # Edge events wake the thread immediately; the timeout only bounds idle wakeups.
+                if self.__request.wait_edge_events(timedelta(seconds=60)):
                     self.__request.read_edge_events()
                     self.__check()
                 retry_delay = 1
             except Exception as e:
-                logging.error("Error in GPIO IN " + self.name + " event loop: " + str(e))
+                logging.error("Error in GPIO IN %s event loop: %s", self.name, e)
                 time.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 30)
 
-    def __check(self, channel=None):
+    def __check(self):
         try:
             new_on = self.__read()
             if new_on != self.__on:
+                now = datetime.now(UTC)
                 self.__on = new_on
-                self.__datetime_last_change = datetime.now(UTC)
+                self.__datetime_last_change = now
                 if new_on:
-                    self.__datetime_last_on = datetime.now(UTC)
+                    self.__datetime_last_on = now
                 else:
-                    self.__datetime_last_off = datetime.now(UTC)
+                    self.__datetime_last_off = now
 
-                msg = "GPIO IN " + self.name + " new effective state: " + str(self.on) + " last_change: " + self.__datetime_last_change.strftime("%Y-%m-%dT%H:%M:%S")
-                config = "GPIO " + str(self.addr) + ": " + str(int(new_on)) + ("; reverted" if self.reverted else "")
-                logging.info(msg + " (" + config + ")")
+                logging.info("GPIO IN %s new effective state: %s (GPIO %s: %d%s)",
+                             self.name, self.on, self.addr, int(new_on), "; reverted" if self.reverted else "")
 
                 self.notify_listeners()
         except Exception as e:
-            logging.error("Error in GPIO IN " + self.name + " listener: " + str(e))
+            logging.error("Error in GPIO IN %s listener: %s", self.name, e)

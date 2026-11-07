@@ -20,7 +20,7 @@ class OutThing(Thing):
         self.ioloop = tornado.ioloop.IOLoop.current()
         self.out = out
 
-        self.is_on = Value(out.is_on, out.switch)
+        self.is_on = Value(out.on, out.switch)
         self.add_property(
             Property(self,
                      'is-on',
