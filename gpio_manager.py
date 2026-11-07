@@ -2,6 +2,7 @@ import os
 import glob
 import logging
 import threading
+import time
 from datetime import datetime, UTC, timedelta
 
 import gpiod
@@ -162,13 +163,17 @@ class InGpio:
             listener(self.name)
 
     def __event_loop(self):
+        retry_delay = 1
         while self.__running:
             try:
                 if self.__request.wait_edge_events(timedelta(seconds=1)):
                     self.__request.read_edge_events()
                     self.__check()
+                retry_delay = 1
             except Exception as e:
                 logging.error("Error in GPIO IN " + self.name + " event loop: " + str(e))
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 30)
 
     def __check(self, channel=None):
         try:

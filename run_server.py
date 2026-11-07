@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 
@@ -5,7 +6,6 @@ from typing import List
 from dataclasses import dataclass
 from webthing import (MultipleThings, WebThingServer)
 from gpio_manager import OutGpio, InGpio
-from gpio_manager_web import GpioManagerWebServer
 from gpio_manager_mcp import GpioManagerMCPServer
 from gpio_manager_webthing import OutThing, InThing
 
@@ -55,16 +55,13 @@ def run_server(name: str, port: int, confs: List[Config]):
     out_gpios = [OutGpio(conf.line, conf.name, conf.description, conf.reverted, conf.chip) for conf in confs if conf.type.lower() == 'out']
     in_gpios = [InGpio(conf.line, conf.name, conf.description, conf.reverted, conf.chip) for conf in confs if conf.type.lower() == 'in']
     server = WebThingServer(MultipleThings([InThing(gpio) for gpio in in_gpios] + [OutThing(gpio) for gpio in out_gpios], "outs"), port=port, disable_host_validation=True)
-    web_server = GpioManagerWebServer(port=port+1, in_gpios=in_gpios, out_gpios=out_gpios)
     mcp_server = GpioManagerMCPServer(name, port=port+2, in_gpios=in_gpios, out_gpios=out_gpios)
     try:
         logging.info('starting the server on port ' + str(port))
-        web_server.start()
         mcp_server.start()
         server.start()
     except KeyboardInterrupt:
         logging.info('stopping the server')
-        web_server.stop()
         mcp_server.stop()
         server.stop()
         logging.info('done')
@@ -73,6 +70,7 @@ def run_server(name: str, port: int, confs: List[Config]):
 if __name__ == '__main__':
     try:
         logging.basicConfig(format='%(asctime)s %(name)-20s: %(levelname)-8s %(message)s', level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+        logging.info("pi_gpio version: %s", os.environ.get("PI_GPIO_VERSION", "dev"))
         logging.getLogger('tornado.access').setLevel(logging.ERROR)
         logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
         logging.getLogger("mcp.server.lowlevel").setLevel(logging.WARNING)
